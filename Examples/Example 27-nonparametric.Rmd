@@ -1,0 +1,390 @@
+### MATH 420: Statistical Modeling
+#### Fall 2021
+
+### Non-parametric statistics: motivation
+
+Classical statistics teaches you a number of hypothesis tests
+
+For one column of data (e.g., temperature data):
+$H_0: \mu = 98.6$
+$H_0: \sigma = 1.5$
+
+For two independent columns of data (e.g., salaries of men and women):
+$H_0: \mu_1 = \mu_2$
+$H_0: \sigma_1 = \sigma_2$
+
+For paired data:
+$H_0: \mu_1 = \mu_2$ (but with a different test statistic)
+
+For two independent columns when we are interested in proportions (e.g., Split or Steal):
+$H_0: p_1 = p_2$
+
+And many more. Classically, each of these tests begins with the assumption that the populations are normally distributed. Of course that can fail in practice. You know that we can do randomization-based inference instead. But before randomization-based inference was feasible (before computers), there was another way to avoid the normality assumption. 
+
+Instead of computing a test statistic based on *means* (like $\overline{y_1} - \overline{y_2}$) you could instead create one based on *medians*. Then, the central limit theorem does not help you, but on the upside you don't need to assume normality. 
+
+You now get a test-statistic and some mathematical theory tells you it follows a BLANK distribution (different ones for each of the tests above) and you can look up its p-value from a table of values for that distribution. For example, in the test for a single population median, the p-value is going to come from a binomial distribution. For the test of a difference between two medians, the p-value is going to come from a normal distribution, but in a VERY different way than the two-sample t-test. The idea is that we compute a test statistic based on ranking (ordering) the data, and then use elementary probability theory with binomial distributions (like, "how likely is it that we would see this weird rank behavior if the null hypothesis was true and we were just randomly throwing balls into bins?") The examples below will clarify.
+
+NOTE: non-parametric tests have much less power than parametric tests. That means they might fail to reject the null even though the null is false. If you have a data set that DOES satisfy normality, you should use a parametric test. It often happens that a parametric test will reject the null but the non-parametric would fail to.
+
+
+#### Testing a single median
+
+Suppose we are given a data column and we have been told that last year's median was 17. So our null hypothesis is that $\eta = 17$, where $\eta$ is the unknown population median for this year's data.
+
+```{r}
+require(mosaic)
+o2 <- c(18,14,13,15,17,19,18,20,19) # this is our data
+
+densityplot(~o2) 
+```
+
+This doesn't really look normal, and n < 30. So we need to use median not mean. Let's do the sign test for the median:
+
+```{r}
+require(BSDA)
+SIGN.test(o2,md = 17,alternative="two.sided",conf.level=.95)
+```
+
+H_0: median = 17, equivalently p = .5 where p = Pr(X > 17)
+
+H_a: median not equal to 17, equivalently p is not .5
+
+A p-value of .7266 says we fail to reject the null.
+
+What if last year's median was 12 instead of 17? We would test:
+
+```{r}
+SIGN.test(o2,md = 12,alternative="two.sided",conf.level=.95)
+```
+
+We would have rejected a claim that the median is 12, based on the p-value.
+
+##### How does this work? (Optional)
+
+Assume for simplicity that the data set has no repeats (this all works if it does, but is harder to write down). The definition of the median $m$ is that, if I pick a data point at random, $Pr(x > m) = 0.5$. 
+
+Here I use $\eta$ for the population median. Our null hypothesis states $H_0: \eta = \eta_0$. I use $\tilde{\eta}$ for the sample median.
+
+The idea of the sign test is to order the data points and try to see if the null hypothesis median really goes in the middle. Count the number of values larger and smaller than $\eta_0$, and call these numbers $r^+$ and $r^-$. Let $r$ be the max of them. Let $n = r^+ + r^-$ (so, ignore the value equal to the median). Let's assume for the sake of simplicity that $r = r^-$, i.e., we saw more values *below* the hypothesized median than above.
+
+The p-value of the sign rank test is: 
+Pr($r$ or more values seen bigger than the hypothesized median) 
+= Pr(in $n$ coin flips, $r$ or more are heads) 
+= 2*dbinom(r,size = n, prob = 0.5)
+
+Reason: each time you look at a data point, there's a probability of 0.5 that it's smaller than the median. If $r = r^+$ then the p-value is 2*(1-dbinom(r,n,0.5)), because we want the tail probability.
+
+In addition to p-values, we can also do confidence intervals, as we will see below.
+
+For example, if my data is:
+-1.4, -0.6, -0.2, -0.9, -3.2, -3.2, -2.4, -0.7, -5.5, +0.1, -0.1, -0.3
+
+In order these are:
+-5.5, -3.2, -3.2, -2.4, -1.4, -0.9, -0.7, -0.6, -0.3, -0.2, -0.1, +0.1
+
+The sample median is halfway between the 6th and 7th largest values i.e. between -0.9 and -0.7, so we make it -0.8.
+
+If the hypothesized median in our example above was -2 then there are only 4 data points less than it (and 8 more than it). You can compute the probability of this happening if you randomly flip 12 coins. What is the probability of 4 heads and 8 tails? It's 2*(1-dbinom(8,12,0.5)). That's easy to compute. The SIGN test function does it for us.
+
+Note that this calculation works no matter what distribution X follows, because we're just asking a random variable $T = $ binom(n,.5) to be less than $a$ (or greater than $n-a+1$), where each of the Bernoulli RVs in $T$ is 1 if $X_i > \tilde{\eta}$ and 0 otherwise.
+
+You can also make confidence intervals based on this median test. We take intervals of the form $(X_{(a)},X_{(n-a-1)})$ for $a < (n+1)/2$, i.e., a number of positions to either side of the observed median. 
+
+Suppose we want to work at the $a$ level of significance (e.g., 95% level). Our confidence level is $(1-2Pr(X_{(a)}>\tilde{\eta}))*100\%$ where $\tilde{\eta}$ is the sample median. For example, to work at the 95% level we need $1-2Pr(X_{(a)}>\tilde{\eta}) > 0.95$ meaning $Pr(X_{(a)}>\tilde{\eta}) < 0.025$. You can solve this for $a$ and figure out how many positions you need to move to either side of the observed sample median. 
+
+If you want to be fancy about it, you can do this totally generally, and solve $Pr(X_{(a)} > \tilde{\eta}) \approx 1-\Phi(\frac{n-a+.5-.5n}{\sqrt{.25n}}) = \alpha/2$ to get $\alpha = .5*n+.5-z_{\alpha/2} \sqrt{.25n}$. Here $\Phi$ is the CDF for the normal distribution, and it comes in as an approximate way to compute exact binomial probabilities.
+
+In our example, since $n=12$, a 95% CI has the following bounds.
+
+\[
+\frac{n}{2} - \frac{1.96 \sqrt{n}}{2} = 6-3.4 = 2.6
+\]
+
+and
+\[
+1+\frac{n}{2} + \frac{1.96 \sqrt{n}}{2} = 1+6+3.4 = 10.4
+\]
+
+So a 95% CI is given by the 3rd and 10th ranked values, (-3.2,-.2) and indeed -.8 is in there.
+
+Note: this is a pretty wide interval! That's because we're non-parametric.
+
+##### How do compute binomial probabilities in R (optional)
+
+Let T be Binom(n,.5). To find the probability that T = k, use *dbinom(k,n,0.5)*. Example: If n = 3 and k = 2, we want Pr(exactly 2 heads when flipping 3 coins).
+
+```{r}
+dbinom(2,3,0.5)
+```
+
+Example: If n = 4 and k = 1, we want Pr(exactly 1 head if flipping 4 coins)
+```{r}
+dbinom(1,4,0.5)
+```
+
+Ways to happen: HTTT, THTT, TTHT, TTTH. Total possible outcomes: 16
+
+To compute Pr(T <= k), use *pbinom(k,n,0.5)*. Example: If n = 3 and k = 1, Pr(T <= 1) = Pr(T = 0) + Pr(T = 1):
+```{r}
+pbinom(1,3,0.5)
+```
+
+If n = 4 and k = 1 then we have the 4 events above, plus TTTT, so 5/16
+```{r}
+pbinom(1,4,0.5)
+```
+
+In the median example, q = Pr(T >= n-a+1) = 1-Pr(T <= n-a)
+
+In our example, n = 12 and a = 4. So n-a = 8
+```{r}
+q = 1 - pbinom(8,12,0.5)
+```
+
+Our confidence level is therefore:
+```{r}
+conf = 1-2*q
+conf
+```
+
+We wanted to be 95% confident, so this is too low. So let's try a = 3 instead
+```{r}
+q = 1-pbinom(9,12,0.5)
+conf = 1-2*q
+conf
+```
+
+Yay! Now we're even more confident than 95%. 
+
+Note: obviously, we can't hit 95% on the nose, due to the discrete nature of a.
+
+#### Wilcoxon for paired data
+
+Suppose now we have paired data, e.g., we make each person run under two different conditions and we record their running times.
+
+```{r}
+paired1 <- c(135,142,137,122,147,151,131)
+paired2 <- c(127,145,131,125,132,147,119)
+
+wilcox.test(paired1,paired2,mu=0,alt="two.sided",paired=T,conf.int=T,exact=F)
+```
+
+We see that the p-value is not significant. This test works much like the above, but you only compare differences for each individual person (not person As time with condition 1 vs person Bs time with condition 2).
+
+#### Wilcoxon signed-rank test (optional)
+
+The Wilcoxon signed-rank test is different from the median test, but also works as a nonparametric analogue to either a one-sample t-test or a paired t-test. It's more powerful than the sign test described before.
+
+H_0: the difference between the pairs follows a symmetric distribution around zero.
+
+If we reject this, we can conclude there really is a difference between the two population medians.
+
+For each individual i, we have two data points $(x_{2,i},x_{1,i})$. As in the classical paired t-test, we compute differences $x_{2,i} - x_{1,i}$ but now we will do ranking and ordering, because it's a non-parametric test. First, we remove all data points where that difference is zero, and we let $N_r$ be our new, reduced, sample size. 
+
+Let $sgn(a-b)$ be the sign of $a-b$ (so, 1 or -1) and $R_i$ is the rank of $|x_{2,i} - x_{1,i}|$ in the ordered set of all such differences. If there is a tie, then $R_i$ is the average of the ranks, e.g., if row i and row j both have a difference of 1.3, and there's only one difference smaller than that in the data, then the rank should be 2 or 3. We define $R_i = R_j = 2.5$. If there was a three-way tie, we'd take the average of 3 numbers, e.g., $(2+3+4)/3$.
+
+Mathematically, the Wilcoxon test-statistic $W$ is defined by the following formula
+
+$$
+W = \sum_{i=1}^{N_r} sgn(x_{2,i}-x_{1,i})*R_i
+$$
+
+If the null hypothesis is true, then the expected value of W is zero. Half of the signs should be -1 and half should be 1. The variance should be 
+
+$$
+\frac{N_r(N_r+1)(2N_r+1)}{6}
+$$
+
+We now look up a p-value in a table of p-values for the W-statistic. It has some distribution, which you could discover via a zillion simulations, to see how likely or unlikely a given value of W is.
+
+Alternatively, you could use mathematical theory. As $N_r$ goes to infinity, the distribution of W statistics converges to a normal distribution. We can compute a z-score as $z = W/\sigma_W$ where $\sigma_W$ is the square root of the variance above. Then, we can look up the p-value in the normal table. Already when $N_r \geq 10$ this normal approximation is good.
+
+#### Difference between two populations
+
+The code below tests $H_0: \eta_1 = \eta_2$ based on data from two populations. It uses the Wilcoxon test, also called the Mann-Whitney-Wilcoxon test.
+
+```{r}
+o1 <- c(25,25,19,21,22,19,15)
+o2 <- c(18,14,13,15,17,19,18,20,19)
+
+densityplot(~o1) # might be normal
+densityplot(~o2) # Doesn't really look normal, and n < 30
+```
+
+H_0: the two groups have the same distribution
+
+In particular, H_0 implies the median of o1 equals the median of o2.
+
+Equivalently: there is a 50% chance that a random value from pop1 exceeds a random value from pop2. Indeed, this second way is more general, and works even if the populations have totally different shapes, like the above.
+
+Before we proceed, does it seem likely there is a difference in centers (mean or median)?
+
+```{r}
+boxplot(o1,o2)
+```
+
+Yes, it looks likely.
+
+Test if the difference in medians is zero, with two-sided alternative. Note that we use *paired=F* because they are INDEPENDENT populations. You can also use *wilcox.test* for the non-parametric version of a paired t-test, if you change to *paired=T*. In that case, it will carry out the Wilcoxon sign-rank test (just like how a classical paired t-test is just a t-test on the column of differences).
+```{r}
+wilcox.test(o1,o2,mu=0,alt="two.sided",paired=F,conf.int=T)
+```
+
+We get a p-value = 0.02845; we reject the null. The error message is a bit annoying. We can fix that with the command *exact=F*:
+
+```{r}
+wilcox.test(o1,o2,mu=0,alt="two.sided",paired=F,conf.int=T,exact=F)
+```
+
+Now no warning because it's not trying to compute the exact p-value. Also, because we said *conf.int=T* it is giving us confidence intervals.
+
+We can also apply a continuity correction, like when we were computing binomial probabilities using the normal table. You probably won't need that any time soon in your life.
+
+```{r}
+wilcox.test(o1,o2,mu=0,alt="two.sided",paired=F,conf.int=T,exact=F,correct=T)
+```
+
+##### What is going on here? (optional)
+
+The Wilcoxon rank sum test is equivalent to the Mann-Whitney U test, and is almost as powerful as the parametric two-sample t-test.
+
+H_0: the two groups have the same distribution
+(in particular, this implies they have the same means and medians, so if we reject the null we are finding that the two populations are different)
+H_1: one distribution has values systematically larger than the other
+
+To compute this W statistic, iterate over o1. For each observation, count how many observations in o2 are smaller (count 0.5 for a tie). So, for 25 in o1 we count 9, for other 25 we count 9, for 22 we count 9, for 21 we count 9, for 19 we count 6 + .5(2), for other 19 the same, and for 15 we count 2.5. Total that's $9*4+7*2+2.5 = 52.5$ just as in the R output above.
+
+An equivalent way to compute this (and the reason so many names are attached to the test) is to write down the ranks of all the data points and then sum up the ranks in o1 (just like the Wilcoxon signed rank test). The average ranking of o1 is 11.5. The average for o2 is 6.1667. So already we're suspicious of the null, which says they'd be equal. The difference between these two mean rankings is 5.33. We need to find the standardized difference (which of course depends on the standard error).
+
+Suppose the two groups have size $n_1$ and $n_2$, and let $N = n_1+n_2$. We let $R_{ij}$ be the rank of the (i,j) difference in the ordered set of all differences. We define:
+
+$$
+S_R^2 = \frac{1}{N-1} \sum_{i,j} (R_{ij} - (N+1)/2)^2 = 2.432583
+$$
+
+Here $N = n_1 + n_2$. Now we're ready to compute the p-value. There are two ways, just like with the signed-rank test. One way is to do a randomization-based permutation test, seeing how extreme this test statistic is compared to the test statistics of a bunch of fake data sets. The other way is to use mathematical theory. As $N$ goes to infinity, the W distribution converges to a normal distribution. If $N\geq 10$ we can compute a z-score as follows, and then look up a p-value in a Normal(0,1) table.
+
+$$
+Z = \frac{\overline{R_1}-\overline{R_2}}{\sqrt{S_R^2(1/n_1 + 1/n_2)}} = \frac{5.333333}{2.432583} = 2.19
+$$
+
+The tail probability for this 2.19 is .014. For a two-tailed test, that gives .028 just as in our Wilcox output.
+
+Note that this z-statistic is equivalent to $(W - \mu_W)/\sigma_W$ where $\mu_W$ is $n_1(N+1)/2$ and $\sigma_W = \sqrt{n_1n_2(N+1)/12}$ (just like the Wilcoxon signed-rank test). 
+
+#### Testing two (paired) proportions
+
+Suppose first we have two independent populations (so, not paired), and samples from each. In each sample we compute the proportion of observations that we could as "success." We have the following hypotheses.
+
+H_0: p_1 = p_2
+H_a: p_1 is not equal to p_2
+
+McNemar's Test is the non-parametric test of these hypotheses, which avoids the disribution assumptions you see in stat 1 for this kind of test (things like "both populations follow a binomial distribution, and $np > 5$ and $n(1-p) > 5$"), see e.g., https://sixsigmastudyguide.com/two-sample-test-of-proportions/
+
+The first step is to write down our observed $\hat{p_1}$ and $\hat{p_2}$.
+
+```{r}
+table <- matrix(c(33,15,12,65), nrow=2,ncol=2)
+table
+```
+
+This is a 2x2 contingency table, with p_1 on the top row, and p_2 on the bottom row. For example p_1 = 33/(33+12) because we had 33 successes and 12 failures. And p_2 = 15/(65+15).
+
+```{r}
+mcnemar.test(table, correct=FALSE) # no continuity correction
+```
+
+The test says "fail to reject." So does the one below. In this case, the answer did not depend on the continuity correction.
+
+```{r}
+mcnemar.test(table, correct=TRUE)
+```
+
+It is actually surprising that these tests failed to detect the difference. That difference is pretty big! Again the issue is that these non-parametric tests are underpowered.
+
+### Kruskal-Wallis Test
+
+Generalizing the computation we did above, with $S_R^2$, gives non-parametric ANOVA, called Kruskal-Wallis. In this test we must assume that the response variable has a continuous distribution in each population (e.g., not a Poisson distribution or binomial distribution).
+
+The null is that all k groups have the same distribution. In particular, this would imply that all k medians are the same. The alternative hypothesis is that some group is systematically larger than some other.
+
+```{r}
+CancerSurvival <- read.csv("http://personal.denison.edu/~whiteda/files/Teaching/CancerSurvival.csv") 
+names(CancerSurvival)
+head(CancerSurvival)
+attach(CancerSurvival)
+boxplot(Survival ~ Organ)
+```
+
+We see that the ANOVA conditions are violated. The standard deviations are not equal. Also, the residuals of a classical ANOVA model are badly non-normal:
+
+```{r}
+mod = lm(Survival ~ Organ)
+plot(mod,which=2)
+```
+
+So we do a Kruskal-Wallis test instead:
+
+```{r}
+kruskal.test(Survival~Organ)
+```
+
+Very low p-value; reject the null.
+
+NOTE: there is no version of Kruskal-Wallis for general two-way ANOVA, nor for two-way ANOVA with interaction. The reason is that it's based on rankings and the method breaks down for two-dimensional data. If you have a two-way ANOVA situation and fail normality, you should do a randomization-based test. Or, you could do two different one-way Kruskal-Wallis tests (one for each of the main effects), but be aware that all the variability that would be explained by the second factor will end up in the error term. Hence, if your two Kruskal-Wallis tests reject the null hypothesis then this means each main effect really matters (you managed to reject despite a monster error term). But, if they fail to reject, it could just be because the test does not fit the data situation, and a randomization-based test might correctly reject the null.
+
+#### Why does this work? (optional)
+
+This test starts exactly like Wilcoxon, i.e. compute all means of ranks, then an appropriate $S^2$. Again, this does not rely on the distribution of the data set at all. Now we get a KW-statistic by summing up, then look up p-value in Chi-square table. It's chi-square because we are comparing two distributions, just like in categorical data analysis. The first distribution is the expected rank sums in each of the k groups. The second distribution is the observed rank sums. This is like a chi-square test of independence. 
+
+Let $n_i$ be the size of group i, and $N = n_1+n_2+\dots+n_k$. Combine all $N$ observations into one group and rank all observations. Let $R_i$ be the rank of the i-th value. Define the KW-statistic as
+
+$$
+KW = \frac{12}{N(N+1)} \sum \frac{R_i^2}{n_i} - 3(N+1)
+$$
+
+When all $n_i \geq 5$ then KW is approximately chi-square distributed with $k-1$ degrees of freedom. So you can look up a p-value in the chi-square table.
+
+### Returning to CPS85 example
+
+Recall the current population survey data (well, from 1985).
+
+```{r}
+data(CPS85)
+```
+
+We've seen that the normality of residuals condition fails badly for the CPS85 dataset. Furthermore, while $n > 30$, the strong skewness suggests a normal approximation is not appropriate. Therefore, we should look to rank-based tests to help us. The rank-based non-parametric version of ANOVA is called Kruskal-Wallis. Here is how to do a Kruskal-Wallis:
+
+```{r}
+kruskal.test(wage~sector,data=CPS85)
+```
+
+The p-value suggests the wages are different in different sectors. It has less power than standard ANOVA F-tests, but works even if the data is skew (however, the distribution in different groups should be roughly the same). At this point, we're happy that most of the groups are right skewed (with a few individuals of large wage), but groups like const and clerical might cause trouble. Perhaps a log transform on wage would be more appropriate. 
+
+```{r}
+data("CPS85")
+logwage = log(CPS85$wage)
+bwplot(logwage ~ CPS85$sector)
+CPS85$logwage = logwage
+names(CPS85)
+```
+
+Let's try our ANOVA tests for this new response variable.
+
+```{r}
+require(car)
+with(CPS85,leveneTest(logwage,sector)) # much closer to homoskedasticity
+mod = lm(logwage ~ sector,data=CPS85)
+plot(mod,which=1) # definitely looks homoskedastic, and with n = 534, I trust the visual test more than the leveneTest (statistically significant is not practically significant here)
+plot(mod,which=2) # probably normal enough, with n = 534
+anova(mod) # low p-value says for sure we have a difference in wage across sectors
+```
+
+
+### Non-parametric versus randomization-based
+
+We have seen that non-parametric tests are underpowered, meaning that if the data set really does satisfy the normality assumption (or if n is large), then you should use a traditional ANOVA. We also know that, if the normality condition is satisfied, then the randomization-based test will agree with the traditional ANOVA unless you are very unlucky. It is worth remembering that the randomization-based test makes no assumptions about the distribution of the data, but *does* assume that the data is a representative sample of the population. 
+
+If the normality assumption is not satisfied (and n is small) then you can't do ANOVA. You can do Kruskal-Wallis instead, and if the p-value is significant then you can be quite certain there is a difference in the population means. However, if Kruskal-Wallis fails to be significant, you cannot be sure that it means there's no difference (maybe the test is just too weak to see the difference). In this case, I would do a randomization-based test. In general, I trust randomization-based tests, but it is true that if n is very small and if the data is very skew then they can sometimes be untrustworthy (to understand why, go read Hesterberg's book). That's why it's good to know non-parametric tests too.
+

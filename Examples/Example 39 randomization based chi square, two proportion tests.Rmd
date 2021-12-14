@@ -1,0 +1,98 @@
+### MATH 420, Fall 2021
+#### Randomization-based inference for categorical data
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load needed packages.
+```{r message=FALSE, warning=FALSE}
+library(Stat2Data)
+library(mosaic)
+```
+
+### Archery data example
+
+Create a data frame for **ArcheryData** and look at the structure of the data.
+```{r}
+data("ArcheryData")
+str(ArcheryData)
+```
+
+Archery Improve by Sex
+```{r}
+tally(Improve~Sex,data=ArcheryData)
+```
+
+Fit logistic regression model to predict Improve based on Sex.
+```{r}
+lmodImp=glm(Improve~Sex,family=binomial,data=ArcheryData)
+summary(lmodImp)
+```
+
+Find the odds ratio for Sex.
+```{r}
+(ORSex=exp(lmodImp$coeff[2]))
+```
+
+Do one randomization, scrambling the Improve values so there is no relationship to Sex and find the odds ratio for Sex.
+```{r}
+lmodRandom=glm(shuffle(Improve)~Sex, family=binomial, data=ArcheryData)
+summary(lmodRandom)
+(ORSexRandom=exp(lmodRandom$coeff[2]))
+```
+
+Collect slopes and convert to odds ratios for lots of simulations. 
+
+Note: Change the set.seed (or delete it) to get a different set of randomizations.
+```{r}
+set.seed(123)
+manyslopes=do(10000)*glm(shuffle(Improve)~Sex, family=binomial, data=ArcheryData)$coeff[2]
+manyOR=exp(round(manyslopes$Sexm,3))
+```
+
+Note: Since there are only 3 cases that did not improve in the dataset, there aren't many different possibilities for the simulations.  Your results will depend on how many of those three cases end up in the male group. Two of these (if 0 males improve or 0 females improve) give extreme cases for the odds ratio.
+```{r}
+tally(round(manyOR,2))
+```
+
+How many of these odds ratios are as large as or larger than the original (3)?
+```{r}
+(count=sum(manyOR>=3))
+(pvalue=count/10000)
+```
+
+This value is consistent with the P-value for Sexm in the original model (0.410).
+
+Now, try a quantitative predictor (Atttendance).
+```{r}
+lmodAttend=glm(Improve~Attendance,family=binomial,data=ArcheryData)
+summary(lmodAttend)
+```
+
+Find the odds ratio for Attend in the original model.
+```{r}
+(AttendOR=round(exp(lmodAttend$coeff[2]),3))
+```
+
+Run 10000 simulations with Improve values randomly shuffled.
+```{r, message=FALSE, warning=FALSE}
+set.seed(456)
+manyattendslopes=do(10000)*glm(shuffle(Improve)~Attendance,family=binomial,data=ArcheryData)$coeff[2]
+manyattendOR=round(exp(round(manyattendslopes$Attendance,3)),3)
+```
+
+```{r}
+tally(manyattendOR)
+```
+
+Again, there are relatively few different possibilities for the odds ratios, depending on where the three "no improves" end up.  For a few simulations, we get extremes if all the no improves end up with the largest or smallest attendance values. 
+
+Finally, how many of these are as (or more) extreme as our original OR?
+```{r}
+(count=sum(manyattendOR>=AttendOR))
+(pvalue=count/10000)
+```
+
+This value is similar to the P-value (0.718) for the Sex variable in the logistic regression. 

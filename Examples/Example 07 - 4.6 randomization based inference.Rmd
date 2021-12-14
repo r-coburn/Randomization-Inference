@@ -1,0 +1,143 @@
+### MATH 420: Statistical Modeling
+#### Fall 2021
+
+### MLR: Randomization (Permutation) Tests (4.6)
+
+```{r, message=FALSE}
+require(mosaic);require(car);require(leaps);require(MASS)
+options(digits=3)
+```
+
+Inference for linear regression only holds if the appropriate conditions are met. What are those conditions? 
+
+We know how to assess whether these conditions are met, and we have learned a few techniques for correcting them when they are not (e.g. transformations). Today, we will learn a few techinques based on randomization for making *non-parametric* inferences. Such inferences do not rely on stringent assumptions about the distribution of the error terms. 
+
+In this example, suppose we are trying to explain a college student's $GPA$ as a function of their score on the verbal section of the SAT (i.e. using an SLR). See Example 4.12 for more about this data set.
+
+```{r}
+GPA = read.csv("http://personal.denison.edu/~whiteda/files/Teaching/FirstYearGPA.csv")
+# Use only the non-null entries
+GPA = subset(GPA, !is.na(GPA))
+# How big is our sample?
+nrow(GPA)
+```
+
+First, let's examine the relationship between these two variables graphically. 
+
+```{r}
+xyplot(GPA ~ SATV, data=GPA, pch=19, cex=2, alpha=0.3, type=c("p","r"))
+```
+
+There appears to be some linear assocation between these variables, but it is not particularly strong. We can quantify this relationship using the correlation coefficient, which I am saving for reference later. 
+
+```{r}
+cor.actual = with(GPA, cor(GPA, SATV))
+cor.actual
+```
+
+In this case the value of the correlation coefficient is about 0.3, which is not large, but does appear to be significantly different from 0. Recall we learned a test for correlation earlier.
+    
+```{r}
+with(GPA, cor.test(GPA, SATV))#test to check for non-zero correlation; new command
+```
+
+This test confirms that the correlation between college GPA and SATV is most likely not zero, but the validity of this test requires the assumptions for simple linear regression to be met (in particular, the normality condition on the errors MUST hold). Let's assume that in this case the assumptions are not met. Can we still feel confident that the correlation is non-zero? 
+
+If GPA and SATV were really correlated, then there is a real relationship binding the i-th value of GPA to the i-th value of SATV. In this case, it would not make sense to link the i-th value of GPA to the some other value of SATV. But if the correlation between these two variables was in fact zero, then it wouldn't matter how we matched up the entries in the variables!
+
+The basic idea of the randomization or permutation test is to shuffle the mapping between the two variables many times (i.e. sample *without replacement*), and examine the distribution of the resulting correlation coefficient. If the actual value of the correlation coefficient is a rare member of that distribution, then we have evidence that the true correlation is non-zero. 
+
+R can shuffle the data for us, and we can watch what happens to the regression lines in the shuffled data. We can also record summary statistics - like the correlation, to see how it behaves when we are "destroying" the relationships between the variables. 
+
+```{r}
+GPA.permute = shuffle(GPA$GPA)
+xyplot(GPA.permute ~ SATV, data=GPA, pch=19, cex=2, alpha=0.3, type=c("p","r"),main="First Shuffle")
+```
+
+```{r}
+GPA.permute = shuffle(GPA$GPA)
+xyplot(GPA.permute ~ SATV, data=GPA, pch=19, cex=2, alpha=0.3, type=c("p","r"),main="Second Shuffle")
+```
+
+```{r}
+GPA.permute = shuffle(GPA$GPA)
+xyplot(GPA.permute ~ SATV, data=GPA, pch=19, cex=2, alpha=0.3, type=c("p","r"),main="Third Shuffle")
+```
+
+The procedure for the randomization test is simple. We simply shuffle the explanatory variable and compute the resulting correlation coefficient with the response variable (it remains this way for MLR too, you want each case to still have the same relationships between the response and OTHER predictors - you just shuffle the one predictor you want to learn about). But we do this many times, until we have a sense of the distribution of that correlation coefficient (or whatever statistic we are interested in). We then examine where the observed correlation (or other statistic) falls in that distribution. 
+
+```{r}
+# Do this 1000 times
+rtest = do(1000) * cor(shuffle(GPA$GPA), GPA$SATV) 
+head(rtest)
+densityplot(~cor, data=rtest, xlim=c(-0.5,0.5), xlab="Correlation Coefficient between GPA and SATV")
+cor.actual
+ladd(panel.abline(v=cor.actual, col="red", lwd=3))
+```
+
+Of course, we can also explicitly find where in the distribution the observed correlation lies. 
+
+```{r}
+bigger <- pdata(cor.actual, rtest$cor) # for each reshuffle, put a 1 into bigger if the correlation is bigger than cor.actual
+
+# Count number of "successes" (i.e. bigger than cor.actual) over num trials:
+length(subset(bigger,bigger == 1))/length(bigger) #provides area above cor.actual based on randomization distribution
+
+# Just to show that pdata is not always all 0 or all 1...
+#pdata(0, rtest$cor)
+#pdata(0, rtest$cor, lower.tail=FALSE)
+```
+
+Finally, we can find a nonparametric 95% confidence interval for the correlation coefficient. The interpretation here is that actual correlation values in this interval would NOT be considered statistically significant.  
+
+```{r}
+quantile(rtest$cor,c(0.025, 0.975)) # Note that .304 is way outside of this CI
+```
+
+Our actual correlation of 0.3 lies entirely above this interval, so we believe we have a statistically significant result.
+
+What if we wanted to do this for a MLR model? Say we still want to predict GPA but we know we have other variables (from your practice midterm) that we might want to include. Maybe we want to really assess if HSGPA has a significant relationship with GPA (as a predictor) when other variables are in the model. 
+
+Let's fit the model first. You might like to try the following model:
+
+```{r}
+fm = lm(GPA ~ HSGPA + SATV + FirstGen, data = GPA)
+summary(fm)
+```
+
+From the t-test, is HSGPA significant? Again, we'd need to believe the regression conditions are met in order to proceed with this inference. 
+
+How can we assess significance with the randomization test? Well, we'd want to leave the relationships between GPA and the other predictors alone (so that we are conditioning on them being in the model), and shuffle up the values of HSGPA. We could then get coefficients for HSGPA in the shuffled models, and see how those coefficients compare to what we get for the non-shuffled model. We can also examine distributions of other statistics, such as the R-squared values. I'll demonstrate both in this example. First, I'll just save the R-squared values. 
+
+```{r}
+actual.rsquared=rsquared(fm); actual.rsquared #save original result for reference
+actual.rsquared # It's .263
+s=do(1000)*rsquared(lm(GPA~shuffle(HSGPA)+SATV+FirstGen,data=GPA))
+head(s)
+s$result = s$rsquared
+hist(s$result)
+favstats(s$result)
+```
+
+It looks like we don't see R-squared values greater than .15 very often with the permuted HSGPA values. Since we saw an actual value of .263, that seems like a pretty unusual value to get if there is no added information in relationship between HSGPA and GPA with SATV and FirstGen in the model. We can check the coefficient itself too.
+
+You could also save the entire sets of models from each permutation, in order to inquire about other statistics, or in this case, the coefficients.
+
+```{r}
+t=do(1000)*(lm(GPA~shuffle(HSGPA)+SATV+FirstGen,data=GPA))
+names(t)
+```
+
+Here you can see that the command saves the coefficients, residual standard error, and r-squared values for you. 
+
+How would you determine if the coefficient of HSGPA was really significant in the model?
+
+```{r}
+hist(t$HSGPA)
+coef(fm) # Note that the coefficient of HSGPA is .52
+smaller <- pdata(.52,t$HSGPA,lower.tail=FALSE) # 1 exactly when t$HSGPA < .52, so the tail beyond .52 is shuffles where smaller == 0.
+length(subset(smaller,smaller == 0))/length(smaller)
+quantile(t$HSGPA,c(0.025, 0.975)) # Note that .52 is well outside the CI
+```
+
+It appears that HSGPA is a significant predictor of GPA when SATV and FirstGen are in the model. 

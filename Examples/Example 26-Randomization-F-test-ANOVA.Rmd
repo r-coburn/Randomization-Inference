@@ -1,0 +1,388 @@
+### MATH 420: Statistical Modeling
+#### Fall 2021
+
+### Warm-up: Randomized two-sample t-test
+
+Recall that ANOVA is a generalization of a two-sample t-test. Suppose I have two independent populations and have measured some number for each (e.g., blood pressure of people who received the treatment vs the control group). 
+
+I want to test $H_0: \mu_1=\mu_2$. Let's suppose we have the data in two columns (one for the control group and one for the treatment group):
+
+```{r}
+ctl.fem <- c(16,10,10,7,17)
+trt.fem <- c(1,2,2,10,7) 
+
+# Get summary stats
+summary(ctl.fem)
+summary(trt.fem)
+```
+
+Five data points per group is pretty small. And we have no idea if the true populations are normal or not. Do our puny five data points look normal?
+
+```{r}
+hist(ctl.fem)
+hist(trt.fem)
+```
+
+Super hard to say. Maybe QQ plots help?
+
+```{r}
+qqnorm(ctl.fem)
+qqnorm(trt.fem)
+```
+
+I guess the first one kinda looks like a line. But the second one? Hard to say.
+
+Maybe Shapiro-Wilk helps?
+
+```{r}
+shapiro.test(trt.fem)
+shapiro.test(ctl.fem)
+```
+
+This says we don't have strong evidence to reject normality, but we haven't seen a slam dunk that the data is normal. If you do a vanilla two-sample t-test, you might have doubts. It would be good to try a randomization-based approach and see if it agrees with your standard two-sample t-test. First we compute the difference in means.
+
+```{r}
+mean(ctl.fem)-mean(trt.fem)
+```
+
+We see an observed difference of 7.6, i.e., $\overline{y_1} - \overline{y_2} = 7.6$. Is that a statistically significant difference? If we believe the two populations are normal we can do:
+
+```{r}
+t.test(ctl.fem,trt.fem)
+```
+
+This says there IS a statistically significant difference. 
+
+Let's do a randomization-based test to be sure. The null hypothesis says there is no difference between the groups, so we can just treat the 10 data points as coming from one big population. That means I could just randomly grab 5 data points and put them in group A, and randomly grab the other 5 to be in group B. Then compute the difference in the two groups. If most of my differences are less than 7.6, this is evidence that 7.6 is a meaningful difference. First we make a space to hold the answers to our 10,000 simulations.
+
+```{r}
+# Let's do 10000 samples
+reps <- 10000
+results <- numeric(reps)
+```
+
+Next we join the two groups into one:
+
+```{r}
+x <- c(trt.fem,ctl.fem)
+```
+
+Finally, we do 10000 simulations. In each we take a random sample of 10 items from the data frame x. That's the same as "shuffle."
+
+```{r}
+for (i in 1:reps){
+  temp <- sample(x)
+  results[i]<-mean(temp[1:5])-mean(temp[6:10])
+}
+```
+
+We compute the p-value. Yours will be different than mine because it is random.
+
+```{r}
+p.value <- sum(results >= 7.6)/reps # just directly counting (numSuccesses)/(numTrials)
+p.value
+```
+
+We see that we, too, reject the null hypothesis that the groups are the same. Note that we implicitly did a *one-tailed* test here (we only counted when a result was >= 7.6). How would you modify this to get a p-value for a two-tailed test?
+
+```{r}
+
+```
+
+We can visualize our random distribution to see just how extreme 7.6 really is.
+
+```{r}
+hist(results)
+```
+
+The histogram is roughly normal, but because there are a limited number of possible outcomes (only 5 samples in each group), the histogram of (MeanCtl – MeanTrt) will never look perfectly normal. If you run fewer iterations you may find an asymmetric graph with one or two bars that looks high in their graph, however, theoretically we know this graph should be symmetric (if we conducted enough iterations) by the central limit theorem. In the long term (100,000 or more iterations) we will see more and more symmetry, but we will not ever see perfect normality.
+
+See if you can do the same with a density plot and adding a red line, as we often do:
+
+```{r}
+
+```
+
+
+
+#### Functional abstraction
+
+In introductory computer science, you learned that if you are going to do something over and over again, you should make it a function. Here is a function to perform a randomization test on the vectors x and y, as above. The output is a vector giving the randomization distribution, p-values for less than ("<"), greater than (">"), and not equal ("=/=") alternative hypotheses, and test statistics.
+
+```{r}
+randtest <- function(x,y,fun=mean,reps=10000) {
+  n <- length(x)
+  m <- length(y)
+  data <- c(x,y)
+  results <- numeric(reps)
+  for (i in 1:reps) {
+    simtemp <- sample(data)
+    results[i] <- fun(simtemp[1:n])-fun(simtemp[(n+1):(n+m)])
+  }
+  greater.p <- sum(results >= (fun(x)-fun(y)))/reps
+  less.p <- sum(results <= (fun(x)-fun(y)))/reps
+  test.stat <- abs(fun(x)-fun(y))
+  two.sided.p <- sum(abs(results)>=test.stat)/reps
+  p.values <- c(greater.p, less.p, two.sided.p)
+  names(simtemp) <- c("p.greater.than", "p.less.than",
+                        "two.sided.p")
+  return(list(results,p.values,test.stat))
+}
+```
+
+To run this randtest function and view a histogram of only the results vector:
+```{r}
+  newtest = randtest(ctl.fem,trt.fem)
+  hist(newtest[[1]])
+  abline(v = 7.6)
+  # adds a line on the graph to represent the test statistic (7.6 in this example)
+```
+
+To get the p-values
+```{r}
+newtest[[2]]
+```
+
+Since the shaded tail area (p-value) is small, we reject
+
+
+### Randomization F Tests (8.5)
+
+```{r, message=FALSE}
+require(mosaic)
+options(digits=3)
+```
+
+We will examine a one-way ANOVA then a two-way ANOVA using randomization F-tests. We will do this on the runners data set but NOTE however, we know this was an observational study, so there was no randomization to treatments, so this test is NOT actually appropriate. For the purposes of today, let's pretend like it was a randomized experiment. 
+
+#### Runners
+
+The runners data set on cardiovascular risk factors includes data from runners who averaged at least 15 miles per week and a control group described as generally sedentary. Both men and women were included in the study. One variable measured was the heart rate after six minutes of exercise on a treadmill.
+
+There are two factor variables in the study: *group* and *gender*. One response variable *hr* is quantitative. We want to see whether or not heart rates differed on average across either groups or genders, with or without an interaction term, using randomization procedures. 
+
+```{r}
+Runners = read.csv("http://personal.denison.edu/~whiteda/files/Teaching/runners.csv")
+```
+
+### One-Way ANOVA
+
+Let's just focus on group (active vs. sedentary), and ignore gender for now. So we're trying to determine if there is a difference in heart rate between the groups.
+
+```{r}
+mod=lm(hr~group,data=Runners)
+anova(mod)
+res=anova(mod)$"F value"# store the F statistics
+res
+```
+
+That's a pretty huge F-statistic, but only if I have reason to believe the residuals are normally distributed and homoskedastic. Let's see how huge it is compared to an empirical distribution of F-statistics obtained by randomly mixing up the data thousands of times. We re-randomize using *shuffle* to see what happens.
+
+```{r}
+newmod=lm(shuffle(hr)~group,data=Runners)
+res2=anova(newmod)$"F value"
+res2
+```
+
+Now repeat thousands of times
+
+```{r}
+t=do(1000)*(anova(lm(shuffle(hr)~group,data=Runners))$"F value")
+```
+
+I force t into a dataframe to make it easier to work with. By default the variables are called V1 and V2, but V2 is empty. Looking at V1 is looking at the differences across groups (runners vs. sedentary). Recall that res[1] is our initial F-statistic.
+
+```{r}
+t=as.data.frame(t)
+densityplot(~V1, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE)
+head(results) # results is telling us, for each dot, whether or not it's smaller than our original F-statistic
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+Let's do the same, but for gender.
+
+```{r}
+mod=lm(hr~gender,data=Runners)
+anova(mod)
+res=anova(mod)$"F value"# store the F statistics
+res
+
+newmod=lm(shuffle(hr)~gender,data=Runners)
+res2=anova(newmod)$"F value"
+res2
+
+t=do(1000)*(anova(lm(shuffle(hr)~gender,data=Runners))$"F value")
+
+t=as.data.frame(t)
+densityplot(~V1, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE)
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+### Two-Way ANOVA
+
+Now let's focus on determining the effect on heart rate of BOTH gender and group.
+
+We want to fit the model so we know what test statistic we started with. I'll start with just the additive model, though we know the interaction is significant.
+
+```{r}
+mod=lm(hr~group+gender,data=Runners)
+anova(mod)
+res=anova(mod)$"F value"# store the F statistics
+res
+```
+
+Note this saves the F statistics for BOTH main effects - group is first and gender is second. Now we re-randomize (well, imagine we were re-randomizing) using *shuffle* to see what happens.
+
+```{r}
+newmod=lm(shuffle(hr)~group+gender,data=Runners)
+res2=anova(newmod)$"F value"
+res2
+```
+
+We can see that the F values are VERY different from the non-shuffled model. You could repeat this to see a few more instances, or we could jump to doing it MANY times with the *do* function.
+
+```{r}
+t=do(1000)*(anova(lm(shuffle(hr)~group+gender,data=Runners))$"F value")
+```
+
+t now contains 1000 copies of the 2 different F statistics, and a third column that is blank (because of how the ANOVA table is stored). If we pull out the correct columns to match the different main effect F statistics we obtained in *res* we can see how unusual our results were compared to what happens if we shuffle and "destroy" the treatment effect. I force t into a dataframe to make it easier to work with. By default the variables are called V1, V2, and V3, but V3 is empty. Looking at V1 is looking at the differences across groups (runners vs. sedentary).
+
+```{r}
+t=as.data.frame(t)
+head(t)
+densityplot(~V1, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results<-pdata(res[1],t$V1,data=t,lower.tail=FALSE)
+length(subset(results,results==0))/length(results)
+```
+
+We can't add the F statistic obtained to the plot because it's way OFF the plot (that command will do nothing). We can see from the pdata command that the estimated p-value is 0. 
+
+We can repeat the same process for the main effect for gender. 
+
+What about the interaction? We can incorporate that fairly easily as well.
+
+```{r}
+mod=lm(hr~group*gender,data=Runners)
+anova(mod)
+res=anova(mod)$"F value"# store the F statistics
+res
+```
+
+Now *res* has four values, but the fourth is empty. The third is the interaction F statistic.
+
+```{r}
+t=do(1000)*(anova(lm(shuffle(hr)~group*gender,data=Runners))$"F value")
+t=as.data.frame(t)
+densityplot(~V3, data=t)
+ladd(panel.abline(v=res[3], col="red", lwd=3))
+results <- pdata(res[3],t$V3,data=t,lower.tail=FALSE)
+length(subset(results,results==0))/length(results)
+```
+
+Assuming this had been a randomized process from the beginning, what would you conclude about whether or not the interaction was significant, using the interaction randomization F-test?
+
+
+
+### Randomization F-test for ANOVA with interaction
+
+Previously, we analyzed the SugarEthanol data
+
+```{r}
+require(Stat2Data)
+data("SugarEthanol")
+head(SugarEthanol)
+```
+
+We made a model
+```{r}
+modBest = lm(sqrt(Ethanol)~Oxygen+Sugar,data=SugarEthanol)
+summary(modBest)
+```
+
+We learned that we cannot trust the p-values, because normality fails and n is not big enough. 
+
+```{r}
+plot(modBest,which=1)
+plot(modBest,which=2) # uh, oh, badly non-normal residuals
+```
+
+Instead, we do randomization based inference. First  we build a distribution of F-statistics for overall model utility from fake data generated under the null hypothesis.
+
+```{r}
+t=do(1000)*(anova(lm(shuffle(sqrt(Ethanol))~Oxygen+Sugar,data=SugarEthanol))$"F value")
+```
+
+Next we figure out how unlikely is the F-stat we actually saw.
+
+```{r}
+res=anova(modBest)$"F value"# store the F statistics
+res
+
+t=as.data.frame(t)
+densityplot(~V1, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE)
+head(results) # results is telling us, for each dot, whether or not it's smaller than our original F-statistic
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+Safe to reject the null.
+
+We can do the same for the two individual t-statistics (testing Oxygen and testing Sugar). We do Oxygen first.
+
+```{r}
+summary(modBest)
+names(summary(modBest))
+summary(modBest)$"coefficients"
+res = summary(modBest)$"coefficients"[3,3] # Oxygen is row 3; t-stat is col 3
+res
+```
+
+Now that we know how to extract the t-statistic we want, we get 1000 fake ones.
+
+```{r}
+t=do(1000)*(summary(lm(shuffle(sqrt(Ethanol))~Oxygen+Sugar,data=SugarEthanol))$"coefficients"[3,3])
+```
+
+Next we figure out how unlikely is the t-stat we actually saw (stored as res).
+
+```{r}
+t=as.data.frame(t)
+names(t)
+densityplot(~result, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results <- pdata(res[1],t$result,data=t,lower.tail=TRUE)
+head(results) # results is telling us, for each dot, whether or not it's smaller than our original F-statistic
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+p = 0.005; reject the null.
+
+Now we do Sugar
+
+```{r}
+res = summary(modBest)$"coefficients"[2,3] # Sugar is row 3; t-stat is col 3
+res
+```
+```{r}
+t=do(1000)*(summary(lm(shuffle(sqrt(Ethanol))~Oxygen+Sugar,data=SugarEthanol))$"coefficients"[2,3])
+```
+
+Next we figure out how unlikely is the t-stat we actually saw (stored as res).
+
+```{r}
+t=as.data.frame(t)
+names(t)
+densityplot(~result, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+results <- pdata(res[1],t$result,data=t,lower.tail=TRUE)
+head(results) # results is telling us, for each dot, whether or not it's smaller than our original F-statistic
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+p = 0; reject the null.
