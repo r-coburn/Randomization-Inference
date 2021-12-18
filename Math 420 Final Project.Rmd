@@ -7,6 +7,12 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+require(mosaic)
+require(agricolae) #possible desired package for LSD; will need to install first time around
+require(Stat2Data)
+require(car)
+require(nortest)
+require(fBasics) # needed for more advanced normality tests, e.g. D'Agostino's
 ```
 
 ```{r}
@@ -27,4 +33,48 @@ plot(xs,ys,pch='.',col=ifelse(in.circle,"blue","grey")
      ,xlab='',ylab='',asp=1,
      main=paste("MC Approximation of Pi =",mc.pi))
 ```
+### Simple Randomization Based Inference using cancer survival data.
 
+```{r}
+Cancer = read.csv("http://personal.denison.edu/~whiteda/files/Teaching/CancerSurvival.csv") # reads in the data
+fv = favstats(~Survival | Organ, data=Cancer) # provides summary stats for survival for each type of cancer in data
+fv
+bwplot(~Survival | Organ, data=Cancer, layout = c(1, 5)) # plots the distribution of survival for each type of cancer in a boxplot
+```
+
+
+```{r}
+mod <- aov(Survival~Organ, data = Cancer) # generates our original model to get our original test stat
+summary(mod) # summary of above model
+plot(mod, which = 1) # plots residuals vs fitted values, check for equal variance
+plot(mod, which = 2) # plots normal-qq, check for noramlly distributed residuals
+leveneTest(mod) # Levene's test for equal variances of groups
+shapiro.test(mod$residuals) # shapiro wilkes test for normality of residuals
+
+```
+
+Normality of residuals and equal variance conditions not met, so we will test for randomness:
+
+```{r}
+library(lawstat)
+runs.test(Cancer$Survival)
+bartels.test(Cancer$Survival)
+```
+
+We fail to reject the null hypothesis that the data is not normal, we can proceed with randomization based inference. 
+
+```{r}
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res=anova(mod)$"F value"# store the F statistics
+t=do(1000)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t=as.data.frame(t)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t) #plots this in a density plot
+ladd(panel.abline(v=res[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+After 1000 permutations, we have come to the conclusion to reject the null hypothesis that the different types of cancers in the data set have the same mean survival rate. Our above randomization distribution essentially says our p-value given our original F-statistic is 0. 
+
+## Testing the 
