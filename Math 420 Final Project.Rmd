@@ -13,7 +13,10 @@ require(Stat2Data)
 require(car)
 require(nortest)
 require(fBasics) # needed for more advanced normality tests, e.g. D'Agostino's
+library(trend)
 ```
+
+### Approximation of Pi using Monte Carlo Simulation. 
 
 ```{r}
 set.seed(10)
@@ -35,6 +38,7 @@ plot(xs,ys,pch='.',col=ifelse(in.circle,"blue","grey")
 ```
 ### Simple Randomization Based Inference using cancer survival data.
 
+<<<<<<< Updated upstream
 ```{r}
 Cancer = read.csv("http://personal.denison.edu/~whiteda/files/Teaching/CancerSurvival.csv") # reads in the data
 fv = favstats(~Survival | Organ, data=Cancer) # provides summary stats for survival for each type of cancer in data
@@ -77,4 +81,46 @@ length(subset(results,results==0))/length(results) # empirical p-value
 
 After 1000 permutations, we have come to the conclusion to reject the null hypothesis that the different types of cancers in the data set have the same mean survival rate. Our above randomization distribution essentially says our p-value given our original F-statistic is 0. 
 
-## Testing the 
+### Simple Randomization Based Inference using plant growth data.
+
+We'll be using the plant growth data to look at whether there is a difference in plant yield (weight) by different treatments. 
+
+```{r}
+data("PlantGrowth")
+attach(PlantGrowth)
+bwplot(~weight | group,layout = c(1, 3)) 
+```
+
+It seems pretty apparent that there is not equal variance between groups. We can construct a model and fit a residual scatterplot to see if we have homoscedasticity. 
+
+```{r}
+mod=lm(weight~group)
+anova(mod)
+```
+
+```{r}
+plot(mod, which=c(1,2))
+```
+
+It's pretty obvious from this that the residuals are not homoscedastic and somewhat lack normality, so we've failed to meet ANOVA conditions... however, we can try a randomization-based approach. The only condition that we have for this test is that our data is a random sample. 
+
+
+```{r}
+original=anova(mod)$"F value" #we store the original F-statistic
+original
+```
+
+```{r}
+t=do(1000)*(anova(lm(shuffle(weight)~group))$"F value")
+
+t=as.data.frame(t)
+densityplot(~V1, data=t)
+ladd(panel.abline(v=res[1], col="red", lwd=3))
+```
+
+```{r}
+results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE)
+length(subset(results,results==0))/length(results)
+```
+
+We get a significant p-value, indicating that we reject the null hypothesis. There is some difference between the plant weight and the treatment that it recieved. 
