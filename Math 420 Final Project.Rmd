@@ -70,16 +70,94 @@ We fail to reject the null hypothesis that the data is not normal, we can procee
 ```{r}
 mod=lm(Survival~Organ,data=Cancer)# our original mod
 anova(mod) # anova to determine utility
-res=anova(mod)$"F value"# store the F statistics
-t=do(1000)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
-t=as.data.frame(t)# generates a dataframe of the randomization distribution
-densityplot(~V1, data=t) #plots this in a density plot
-ladd(panel.abline(v=res[1], col="red", lwd=3)) #adds a line in for our original F-stat
-results <- pdata(res[1],t$V1,data=t,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+res0=anova(mod)$"F value"# store the F statistics
+t0=do(1000)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t0=as.data.frame(t0)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t0) #plots this in a density plot
+ladd(panel.abline(v=res0[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res0[1],t0$V1,data=t0,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
 length(subset(results,results==0))/length(results) # empirical p-value
 ```
 
 After 1000 permutations, we have come to the conclusion to reject the null hypothesis that the different types of cancers in the data set have the same mean survival rate. Our above randomization distribution essentially says our p-value given our original F-statistic is 0. 
+
+## Testing the Asymptotic Null 
+
+Above, we ran the shuffled model 1000 times, what if we ran it 100, 500, 1000, 5000, and 10000 times, would the p-value converge?
+
+```{r}
+set.seed(5)
+# 100 times
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res1=anova(mod)$"F value"# store the F statistics
+t1=do(100)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t1=as.data.frame(t1)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t1) #plots this in a density plot
+ladd(panel.abline(v=res1[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res1[1],t1$V1,data=t1,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
+When run 100 times, the distribution couldn't even display our original F-stat, it was too big for the plot!
+
+We can try again with 500 runs:
+
+```{r}
+set.seed(5)
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res2=anova(mod)$"F value"# store the F statistics
+t2=do(500)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t2=as.data.frame(t2)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t2) #plots this in a density plot
+ladd(panel.abline(v=res2[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res2[1],t2$V1,data=t2,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+We are getting closer, but still our original F-stat was too large, so doesn't appear in the plot, we have already tried 1000, so let's go for 2500. 
+
+```{r}
+set.seed(5)
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res3=anova(mod)$"F value"# store the F statistics
+t3=do(2500)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t3=as.data.frame(t3)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t3) #plots this in a density plot
+ladd(panel.abline(v=res3[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res3[1],t3$V1,data=t3,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+At 2500 runs, we get a p-value of .0016. Which is larger than 0, but what are the chances our actual results are the first of their kind? Let's try 5000:
+
+```{r}
+set.seed(5)
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res4=anova(mod)$"F value"# store the F statistics
+t4=do(5000)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t4=as.data.frame(t4)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t4) #plots this in a density plot
+ladd(panel.abline(v=res4[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res4[1],t4$V1,data=t4,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+Okay, now our p-value is starting to take shape. We got a .0014, which is close to .0016, so maybe we are approaching our asymptote. Let's go real big and try 10000:
+
+```{r}
+set.seed(5)
+mod=lm(Survival~Organ,data=Cancer)# our original mod
+anova(mod) # anova to determine utility
+res5=anova(mod)$"F value"# store the F statistics
+t5=do(10000)*(anova(lm(shuffle(Survival)~as.factor(Organ),data=Cancer))$"F value")# repeat above process 1000 times with shuffled response variable. 
+t5=as.data.frame(t5)# generates a dataframe of the randomization distribution
+densityplot(~V1, data=t5) #plots this in a density plot
+ladd(panel.abline(v=res[1], col="red", lwd=3)) #adds a line in for our original F-stat
+results <- pdata(res5[1],t5$V1,data=t5,lower.tail=FALSE) # generating the number of F-stats as or more extreme than our original
+length(subset(results,results==0))/length(results) # empirical p-value
+```
+
 
 ### Simple Randomization Based Inference using plant growth data.
 
