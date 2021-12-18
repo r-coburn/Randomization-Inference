@@ -1,0 +1,35 @@
+% Credits are indicated where needed. The general idea is based on a template by Vel (vel@LaTeXTemplates.com) and Frits Wenneker.
+
+\documentclass[11pt, a4paper]{article} % General settings in the beginning (defines the document class of your paper)
+% 11pt = is the font size
+% A4 is the paper size
+% “article” is your document class
+
+\input{general.tex} % Loads required packages from the separate file 
+
+%---------------------------------------------------------------------------------
+%	General information
+%---------------------------------------------------------------------------------
+\title{Why Randomization Based Inference Works} % Adds your title
+\author{
+Jake Caldwell \& Riley Coburn \\
+\institution{Denison University}
+\thanks{Dr. David White}
+       }
+
+\date{\small \today} % Adds the current date to your “cover” page; leave empty if you do not want to add a date
+
+
+\begin{document}
+
+\maketitle 
+
+\input{content/1-introduction} 
+\input{content/2-WhatisRBI} 
+\input{content/3-WhyDoesRBIWork}
+\input{content/4-limitations} 
+\input{content/5-MonteCarloSim} 
+\input{content/6-conclusion} 
+\input{content/7-bibliography}
+
+\end{document}

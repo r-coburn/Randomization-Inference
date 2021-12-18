@@ -1,0 +1,87 @@
+%----------------------------------------------------------------------------------------
+% What is RBI
+%----------------------------------------------------------------------------------------
+
+\section{What is Randomization Based Inference}
+\subsection{Definition}
+The general explanation goes something like this: If the data we are analyzing falls to meet our model conditions but passes the randomness assumption, we can randomly “shuffle” or permute our response variable (or treatment groups, or our multiple explanatory variables, etc.) $n$ times to estimate a distribution of test statistics. From this distribution, we calculate the number of test statistics that are as extreme or more extreme than our original test statistic, coming from the original model we created. This proportion is then our p-value. We can trust this p-value and use it to make a judgement on whatever to reject or fail to reject our null hypothesis.
+\newline\\
+Algorithmically, suppose we have some randomly sampled dataset, $A$, with test statistic, $S_0$. We can make $J$-many permutations of the column of responses in $A$ where these permuted matrices are $A_j^*$ with test statistic $S_j$.
+$$
+    A=\begin{pmatrix}
+        x_{1,1} & x_{1,2} & \cdots & y_{1} \\
+        x_{2,1} & x_{2,2} & \cdots & y_{2} \\
+        \vdots  & \vdots  & \ddots & \vdots  \\
+        x_{n,1} & x_{n,2} & \cdots & y_{n} 
+    \end{pmatrix}\longrightarrow
+    A_j^*=\begin{pmatrix}
+        x_{1,1} & x_{2,2} & \cdots & y_{i} \\
+        x_{2,1} & x_{2,2} & \cdots & y_{i} \\
+        \vdots  & \vdots  & \ddots & \vdots  \\
+        x_{n,1} & x_{n,2} & \cdots & y_{i} 
+    \end{pmatrix} 
+$$
+\\
+Where our p-value is calculated as 
+
+$$
+\hat{p}=\frac{\sum_{j=1}^{J}I(|S_j|\geq|S_0|)}{J} % add source from the article for this 
+$$
+\\
+\subsection{In Practice}
+There is often more to this picture than just the above definition. Different kind of data require different kinds of permutation methods to perform statistical inference. Take a two-sample t-test for example.  We start with the sampling process. Let us imagine that we have two treatments, $A$ and $B$ with $n_1$ and $n_2$ randomly assigned patients, respectively. 
+\\
+$$
+    A=\begin{pmatrix}
+        x_{1}\\
+        x_{2}\\
+        \vdots\\
+        x_{n_1}
+    \end{pmatrix}\quad\quad
+    B=\begin{pmatrix}
+        x_{n_1+1}\\
+        x_{n_1+2}\\
+        \vdots\\
+        x_{n_1+n_2}
+    \end{pmatrix} 
+$$
+\newline\\
+If from here we randomly sample $n_1$ patients into $A$ without replacement and put the rest into $B$, we will have ensured that our new data is random as the treatments were randomly assigned in our initial sample. That is, under the assumption of the null hypothesis, if there was no difference in treatments $A$ and $B$, we could assign each data point from the whole study to each treatment randomly. 
+\\
+$$
+    A^*=\begin{pmatrix}
+        x_{k}\\
+        x_{k}\\
+        \vdots\\
+        x_{k}
+    \end{pmatrix}\quad\quad
+    B^*=\begin{pmatrix}
+        x_{k}\\
+        x_{k}\\
+        \vdots\\
+        x_{k}
+    \end{pmatrix} 
+$$
+\newline\\
+From here, we don’t have to check our model conditions anymore because we have committed to moving forward with randomization based inference. The next step in the process will be to calculate our test statistic from this permutation of the data. For this example with two treatments, we could calculate a difference in sample means, generating a t-statistic. Following this, we repeat the initial sampling procedure and extract a difference in means t-statistic $N$-many times. 
+\\
+$$
+    A_n^*=\begin{pmatrix}
+        x_{k}\\
+        x_{k}\\
+        \vdots\\
+        x_{k}
+    \end{pmatrix}\quad\quad
+    B_n^*=\begin{pmatrix}
+        x_{k}\\
+        x_{k}\\
+        \vdots\\
+        x_{k}
+    \end{pmatrix} 
+$$
+\begin{center}
+    For $k\in \{1,2,3\dots,n_1+n_2\}$ for $N$-many permutations.
+\end{center}
+\newline\\
+When this process is done, we take our t-statistics and plot them on a dotplot. The result we get is called a randomization or reference distribution. Consequently, that distribution is centered on the null hypothesis of the given test we are conducting meaning that the reference distribution we created is also a null distribution. Using this distribution, we locate where our original test statistic calculated using $A$ and $B$ would fall on this distribution. We then count the number of new test statistics that are as or more extreme than the original one and divide that by the number of total test statistics calculated. This proportion that is yielded is our p-value. The error rate of this p-value has been maintained at the original significance level we started with as well. We can then take this p-value and use it to either reject or fail to reject the null hypothesis of the test we conducted. 
+	
